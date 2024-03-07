@@ -128,11 +128,20 @@ async function setLastSNSTime(lastStartSnsTime)
     await setAlarmData(snsAlarmData);
 }
 
+let previousState = false;
+
 async function updateAlarm(url)
 {
-    await updateAlarmData();
     
-    if(isStartSns(url))
+    let startSns = isStartSns(url);
+    
+    if(previousState == startSns)
+        return;
+    previousState = startSns
+    
+    await updateAlarmData();
+
+    if(startSns)
     {
         console.log(`Alarm On`);
         await setLastSNSTime(Date.now());
@@ -176,7 +185,7 @@ runCritical(
         {
             let timeDiff = Date.now() - alarmData.updateTime;
             console.log(`check reset timer condition\nTime Diff from Last Update : ${(timeDiff / 60000).toFixed(0)} minutes`);
-            if(alarmData.updateTime === undefined || timeDiff > 3600000)
+            if(alarmData.updateTime === undefined || timeDiff > 18000000)
             {
                 console.log(`reset alarm time`);
                 await resetNextAlarmTime();

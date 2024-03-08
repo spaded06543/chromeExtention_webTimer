@@ -212,17 +212,12 @@ chrome.alarms.onAlarm.addListener(
 
                 if(!(snsData.lastStartSnsTime > 0))
                     return;
+                
+                createMyNotification(
+                    "SNS Alarm",
+                    `It has been ${(snsData.totalUsingTime / 60000).toFixed(0)} minutes on SNS.`,
+                    [{title : "Got it"}]);
 
-                chrome.notifications.create(
-                    'mySnsAlarm',
-                    {
-                        type : "basic",
-                        iconUrl : 'images/timer_128.png',
-                        title : "SNS Alarm",
-                        message : `It has been ${(snsData.totalUsingTime / 60000).toFixed(0)} minutes on SNS.`,
-                        buttons : [{title : "Got it"}],
-                        priority : 2,
-                    });
                 await setAlarm();
             })
     });
@@ -269,10 +264,11 @@ async function saveAlarmDataAndExit()
 chrome.tabs.onRemoved.addListener(
     (tabId, removeInfo) =>
     {
-        console.log(`closing tab : ${tabId}`);
         runCritical(
             async () =>
             {
+                console.log(`closing tab : ${tabId}`);
+        
                 if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
                     return;
 
@@ -303,9 +299,10 @@ chrome.action.onClicked.addListener(
             async () =>
             {
                 let snsData = await getAlarmData();
+                let nextAlarmTimeText = `--`;
+                let restAlarmTimeText = `--`;
                 let totalUsingTime = snsData.totalUsingTime;
-                let alarmInfo = ``;
-                
+                let totalUsingTimeText = `${((totalUsingTime) / 60000).toFixed(0)} minutes`;
                 if(snsData.lastStartSnsTime > 0)
                 {
                     totalUsingTime += Date.now() - snsData.lastStartSnsTime;
@@ -313,23 +310,28 @@ chrome.action.onClicked.addListener(
                     let nextAlarmTime = Date.now() + restAlarmTime;
                     let nextAlarmFormatTime = new Date(0);
                     nextAlarmFormatTime.setMilliseconds(nextAlarmTime);
-                    
-                    alarmInfo = `\nNext Alarm Time : ${nextAlarmFormatTime.toLocaleTimeString("en-US", { hour12: false, hour: '2-digit', minute: '2-digit',})}\nRest Alarm Time : ${(restAlarmTime / 60000).toFixed(0)} minutes`;
+                    nextAlarmTimeText = `${nextAlarmFormatTime.toLocaleTimeString("en-US", { hour12: false, hour: '2-digit', minute: '2-digit',})}`;
+                    restAlarmTimeText = `${(restAlarmTime / 60000).toFixed(0)} minutes`;
                 }
                 
-                let snsTimeInfo = `[ SNSData ]\nToday Total SNS Time : ${((totalUsingTime) / 60000).toFixed(0)} minutes`;
-                console.log(`tab : ${tab.id}\ncontent : ${snsTimeInfo}`);
-                
-                chrome.notifications.create(
-                    'mySnsAlarm',
-                    {
-                        type : "basic",
-                        iconUrl : 'images/timer_128.png',
-                        title : "Status",
-                        message : snsTimeInfo + alarmInfo,
-                        buttons : [{title : "Got it"}],
-                        priority : 2,
-
-                    })
+                createMyNotification(
+                    "Status",
+                    `[ SNSData ]\nToday Total SNS Time : ${totalUsingTimeText}\nNext Alarm Time : ${nextAlarmTimeText}\nRest Alarm Time : ${restAlarmTimeText}`,
+                    [{title : "Got it"}]);
             });
     });
+
+function createMyNotification(title, message, buttons)
+{
+    console.log(`title : ${title}\nmessage : ${message}`);
+    chrome.notifications.create(
+        'mySnsAlarm',
+        {
+            type : "basic",
+            iconUrl : 'images/timer_128.png',
+            title : title,
+            message : message,
+            buttons : buttons,
+            priority : 2,
+        })
+}

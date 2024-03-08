@@ -169,6 +169,10 @@ runCritical(
     async () =>
     {
         console.log(`background initialization starting...`);
+        
+        await chrome.alarms.clear(myAlarmName);
+        let alarms = await chrome.alarms.getAll();
+        console.log(`alarm number after clear all : ${alarms.length}`);
         let alarmData = await getAlarmData();
         
         if(alarmData === undefined)
@@ -184,14 +188,14 @@ runCritical(
         else
         {
             let timeDiff = Date.now() - alarmData.updateTime;
-            console.log(`check reset timer condition\nTime Diff from Last Update : ${(timeDiff / 60000).toFixed(0)} minutes`);
+            console.log(`check reset timer condition\npassing Time from Last Update : ${(timeDiff / 60000).toFixed(0)} minutes`);
             if(alarmData.updateTime === undefined || timeDiff > 18000000)
             {
                 console.log(`reset alarm time`);
                 await resetNextAlarmTime();
             }
         }
-        console.log(`data : ${JSON.stringify(await getAlarmData())}`);
+        console.log(`result : ${JSON.stringify(await getAlarmData())}`);
         console.log(`background initialization finished`);
     });
 
@@ -205,6 +209,9 @@ chrome.alarms.onAlarm.addListener(
                     return;
         
                 let snsData = await updateAlarmData();
+
+                if(!(snsData.lastStartSnsTime > 0))
+                    return;
 
                 chrome.notifications.create(
                     'mySnsAlarm',

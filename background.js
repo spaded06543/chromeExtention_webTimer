@@ -1,4 +1,4 @@
-const targetSnsSets =
+const targetUrls =
     [
         'https://www.facebook.com/', 
         'https://www.plurk.com/', 
@@ -40,11 +40,10 @@ function setAlarmData(data)
     return chrome.storage.local.set(wrapper);
 }
 
-function isStartSns(url)
+function isTargetUrl(url)
 {
     url = url ?? "";
-    let targetSNS = targetSnsSets.find((v, _, __) => url.startsWith(v));
-    // console.log(`check url: ${url}, result : ${targetSNS}`);
+    let targetSNS = targetUrls.find((v, _, __) => url.startsWith(v));
     return !(targetSNS === undefined);
 }
 
@@ -134,7 +133,7 @@ let previousState = false;
 async function updateAlarm(url)
 {
     
-    let startSns = isStartSns(url);
+    let startSns = isTargetUrl(url);
     
     if(previousState == startSns)
         return;

@@ -4,7 +4,8 @@ const targetSnsSets =
         'https://www.plurk.com/', 
         'https://twitter.com/', 
         'https://discord.com/', 
-        'https://www.youtube.com/watch?v=', 
+        'https://www.youtube.com/watch?v=',
+        'https://www.youtube.com/shorts', 
         'https://www.gamer.com.tw/',
         'https://www.ptt.cc/bbs/'
     ];
@@ -170,9 +171,9 @@ runCritical(
     {
         console.log(`background initialization starting...`);
         
-        await chrome.alarms.clear(myAlarmName);
+        let cleanResult = await chrome.alarms.clearAll();
         let alarms = await chrome.alarms.getAll();
-        console.log(`alarm number after clear all : ${alarms.length}`);
+        console.log(`alarm clean result : ${cleanResult}, number after clear all : ${alarms.length}`);
         let alarmData = await getAlarmData();
         
         if(alarmData === undefined)
@@ -188,7 +189,7 @@ runCritical(
         else
         {
             let timeDiff = Date.now() - alarmData.updateTime;
-            console.log(`check reset timer condition\npassing Time from Last Update : ${(timeDiff / 60000).toFixed(0)} minutes`);
+            console.log(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
             if(alarmData.updateTime === undefined || timeDiff > 18000000)
             {
                 console.log(`reset alarm time`);
@@ -212,6 +213,8 @@ chrome.alarms.onAlarm.addListener(
 
                 if(!(snsData.lastStartSnsTime > 0))
                     return;
+
+                console.log(`on alarm : ${JSON.stringify(alarm)}`);
                 
                 createMyNotification(
                     "SNS Alarm",
@@ -253,12 +256,13 @@ chrome.tabs.onUpdated.addListener(
             });
     });
 
-async function saveAlarmDataAndExit()
+async function saveDataAndcleanUp()
 {
-    console.log(`start updating alarm data while closing tab`);
+    console.log(`start saving and cleaning up`);
     await updateAlarmData();
     await setLastSNSTime(-1);
-    console.log(`finish updating alarm data while closing tab`);
+    await chrome.alarms.clearAll();
+    console.log(`finish saving and cleaning up`);
 }
 
 chrome.tabs.onRemoved.addListener(
@@ -272,7 +276,7 @@ chrome.tabs.onRemoved.addListener(
                 if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
                     return;
 
-                await saveAlarmDataAndExit();
+                await saveDataAndcleanUp();
             });
     });
 
@@ -286,7 +290,7 @@ chrome.windows.onRemoved.addListener(
                 if(windows.length == 0)
                 {
                     console.log(`All windows is closed`);
-                    await saveAlarmDataAndExit();
+                    await saveDataAndcleanUp();
                 }
             });
     },
@@ -335,3 +339,15 @@ function createMyNotification(title, message, buttons)
             priority : 2,
         })
 }
+
+chrome.runtime.onSuspend.addListener(
+    () =>
+    {
+        runCritical(
+            async () =>
+            {
+                console.log(`on suspending`);
+                await saveDataAndcleanUp();
+            }
+        )
+    });

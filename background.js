@@ -10,34 +10,43 @@ const targetUrls =
         'https://www.ptt.cc/bbs/'
     ];
 const myAlarmName = "mySnsAlarm";
-const alarmTimeInMilliSeconds = 600000;
+const alarmTimeInMinutes = 10;
 const snsAlarmDataKey = "snsAlarmData";
+const ticPeriodInMinutes = 0.1;
 
-function clearAlarm()
+function getDefaultData()
 {
-    // console.log(`Clear alarm`);
-    chrome.alarms.clear(myAlarmName);
+    let ret = 
+        {
+            totalUsingTime : 0,
+            nextAlarmUsingTime : alarmTimeInMinutes,
+            updateTime : -1
+        };
+    return ret;
 }
 
 async function getAlarmData()
 {
-    let result = await chrome.storage.local.get(snsAlarmDataKey);
+    let result = await chrome.storage.local.get();
+    
     if(result === undefined)
-    {
-        console.log(`alarm data doesn't exist`);
-        return undefined;
-    }
-    console.log(`get data : ${JSON.stringify(result[snsAlarmDataKey])}`);
+        return getDefaultData();
+
+    console.log(`get data : ${JSON.stringify(result)}`);
+    
     return result[snsAlarmDataKey];
 }
 
-function setAlarmData(data)
+async function saveAlarmData(data)
 {
-    console.log(`save data : ${JSON.stringify(data)}`);
-    let wrapper = {};
     data.updateTime = Date.now();
+    let wrapper = {};
     wrapper[snsAlarmDataKey] = data;
-    return chrome.storage.local.set(wrapper);
+
+    console.log(`set data : ${JSON.stringify(wrapper)}`);
+    
+
+    await chrome.storage.local.set(wrapper);
 }
 
 function isTargetUrl(url)
@@ -47,154 +56,66 @@ function isTargetUrl(url)
     return !(targetSNS === undefined);
 }
 
-async function setAlarm()
-{
-    let restAlarmTimeInMinutes = await getRestAlarmTime() / 60000;
-    console.log(`Set alarm time : ${restAlarmTimeInMinutes} minutes (${restAlarmTimeInMinutes * 60} seconds)`);
-    chrome.alarms.create(
-        myAlarmName,
-        {
-            delayInMinutes : Math.max(0.5, restAlarmTimeInMinutes),
-        });
-}
-
-async function updateAlarmData()
-{
-    let snsAlarmData = await getAlarmData();
-    
-    if(snsAlarmData.lastStartSnsTime > 0)
-    {
-        let now = Date.now();
-        let usingTime = now - snsAlarmData.lastStartSnsTime;
-        snsAlarmData.totalUsingTime += usingTime;
-        snsAlarmData.lastStartSnsTime = now;
-        
-        if(snsAlarmData.totalUsingTime >= snsAlarmData.nextAlarmUsingTime)
-        {
-            snsAlarmData.nextAlarmUsingTime += 
-                alarmTimeInMilliSeconds * 
-                Math.ceil((snsAlarmData.totalUsingTime - snsAlarmData.nextAlarmUsingTime) / alarmTimeInMilliSeconds)
-        }
-        
-        await setAlarmData(snsAlarmData);
-    }
-
-    return snsAlarmData;
-}
-
-async function resetNextAlarmTime()
-{
-    let snsAlarmData = await getAlarmData();
-    snsAlarmData.nextAlarmUsingTime = alarmTimeInMilliSeconds;
-    snsAlarmData.totalUsingTime = 0;
-    await setAlarmData(snsAlarmData);
-}
-
-async function getRestAlarmTime()
-{
-    let snsAlarmData = await getAlarmData();
-    let restAlarmTime = alarmTimeInMilliSeconds;
-    if(snsAlarmData.nextAlarmUsingTime !== undefined && snsAlarmData.nextAlarmUsingTime > snsAlarmData.totalUsingTime)
-    {
-        restAlarmTime = snsAlarmData.nextAlarmUsingTime - snsAlarmData.totalUsingTime;
-        if(snsAlarmData.lastStartSnsTime > 0)
-        {
-            restAlarmTime -= (snsAlarmData.lastStartSnsTime - Date.now());
-        }
-        else
-        {
-            console.log(`exclude lastStartSnsTime`);
-        }
-    }
-    else
-    {
-        console.log(`Unable to get rest alarm time from data: ${JSON.stringify(snsAlarmData)}`);
-    }
-
-    return restAlarmTime;
-}
-
-async function setRestAlarmTime(alarmTime)
-{
-    let snsAlarmData = await getAlarmData();
-    snsAlarmData.nextAlarmUsingTime = alarmTime;
-    await setAlarmData(snsAlarmData);
-}
-
-async function setLastSNSTime(lastStartSnsTime)
-{
-    let snsAlarmData = await getAlarmData();
-    snsAlarmData.lastStartSnsTime = lastStartSnsTime;
-    await setAlarmData(snsAlarmData);
-}
-
-let previousState = false;
+let previousResult = false;
 
 async function updateAlarm(url)
 {
+    let result = isTargetUrl(url);
     
-    let startSns = isTargetUrl(url);
-    
-    if(previousState == startSns)
+    if(previousResult == result)
         return;
-    previousState = startSns
     
-    await updateAlarmData();
-
-    if(startSns)
+    previousResult = result
+    
+    if(result)
     {
+        if((await chrome.alarms.getAll()).length > 0)
+            return;
+        
         console.log(`Alarm On`);
-        await setLastSNSTime(Date.now());
-        await setAlarm();
+        chrome.alarms.create(
+            myAlarmName,
+            {
+                periodInMinutes : ticPeriodInMinutes,
+            });
     }
     else
     {
         console.log(`Alarm Off`);
-        await setLastSNSTime(-1);
-        clearAlarm();
+        await chrome.alarms.clear(myAlarmName);
     }
 }
 
-let previous = undefined;
-async function runCritical(code)
+let executingTask = undefined;
+async function runCritical(task)
 {
-    if(!(previous === undefined))
-        await previous
-    previous = code();
-    await previous;
-    previous = undefined;
+    if(!(executingTask === undefined))
+        await executingTask
+    executingTask = task();
+    await executingTask;
+    executingTask = undefined;
 }
 
 runCritical(
     async () =>
     {
         console.log(`background initialization starting...`);
-        
+
         let cleanResult = await chrome.alarms.clearAll();
-        let alarms = await chrome.alarms.getAll();
-        console.log(`alarm clean result : ${cleanResult}, number after clear all : ${alarms.length}`);
+        console.log(`alarm clean result : ${cleanResult}, number after clear all : ${(await chrome.alarms.getAll()).length}`);
+        
         let alarmData = await getAlarmData();
         
-        if(alarmData === undefined)
+        console.log(`initializing data`);
+        let timeDiff = Date.now() - alarmData.updateTime;
+        console.log(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
+        
+        if(alarmData.updateTime > 0 && timeDiff > 18000000)
         {
-            console.log(`initializing data`);
-            await setAlarmData(
-                {
-                    totalUsingTime : 0,
-                    lastStartSnsTime : -1,
-                    nextAlarmUsingTime : alarmTimeInMilliSeconds
-                });
+            console.log(`reset alarm time`);
+            await saveAlarmData(getDefaultData());
         }
-        else
-        {
-            let timeDiff = Date.now() - alarmData.updateTime;
-            console.log(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
-            if(alarmData.updateTime === undefined || timeDiff > 18000000)
-            {
-                console.log(`reset alarm time`);
-                await resetNextAlarmTime();
-            }
-        }
+
         console.log(`result : ${JSON.stringify(await getAlarmData())}`);
         console.log(`background initialization finished`);
     });
@@ -205,22 +126,35 @@ chrome.alarms.onAlarm.addListener(
         runCritical(
             async () =>
             {
+                let alarmDelayInMinutes = (Date.now() - alarm.scheduledTime) / 60000;
+                
+                //set a threshold to skip unexpected alarm from previous start up.
+                console.log(`alarm delay: ${alarmDelayInMinutes}`);
+                if(alarmDelayInMinutes >= 0.2)
+                    return;
+
                 if(alarm.name !== myAlarmName || currentActivateInfo == undefined)
                     return;
-        
-                let snsData = await updateAlarmData();
-
-                if(!(snsData.lastStartSnsTime > 0))
-                    return;
-
-                console.log(`on alarm : ${JSON.stringify(alarm)}`);
                 
-                createMyNotification(
-                    "SNS Alarm",
-                    `It has been ${(snsData.totalUsingTime / 60000).toFixed(0)} minutes on SNS.`,
-                    [{title : "Got it"}]);
+                let data = await getAlarmData();
+    
+                data.totalUsingTime += ticPeriodInMinutes;
 
-                await setAlarm();
+                if( alarmDelayInMinutes > 0)
+                    data.totalUsingTime += alarmDelayInMinutes ;
+
+                if(data.totalUsingTime >= data.nextAlarmUsingTime)
+                {
+                    console.log(`on alarm : ${JSON.stringify(alarm)}`);
+                
+                    data.nextAlarmUsingTime += 
+                        alarmTimeInMinutes *
+                        Math.ceil((data.totalUsingTime - data.nextAlarmUsingTime) / alarmTimeInMinutes);
+                    
+                    showAlarmData(data);
+                }
+
+                await saveAlarmData(data);
             })
     });
 
@@ -255,15 +189,6 @@ chrome.tabs.onUpdated.addListener(
             });
     });
 
-async function saveDataAndcleanUp()
-{
-    console.log(`start saving and cleaning up`);
-    await updateAlarmData();
-    await setLastSNSTime(-1);
-    await chrome.alarms.clearAll();
-    console.log(`finish saving and cleaning up`);
-}
-
 chrome.tabs.onRemoved.addListener(
     (tabId, removeInfo) =>
     {
@@ -275,54 +200,20 @@ chrome.tabs.onRemoved.addListener(
                 if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
                     return;
 
-                await saveDataAndcleanUp();
+                updateAlarm("");
             });
     });
-
-chrome.windows.onRemoved.addListener(
-    (windowId) =>
-    {
-        runCritical(
-            async () =>
-            {
-                let windows = await chrome.windows.getAll({windowTypes : ["normal"]});
-                if(windows.length == 0)
-                {
-                    console.log(`All windows is closed`);
-                    await saveDataAndcleanUp();
-                }
-            });
-    },
-    );
 
 chrome.action.onClicked.addListener(
-    (tab) =>
-    {
-        runCritical(
-            async () =>
-            {
-                let snsData = await getAlarmData();
-                let nextAlarmTimeText = `--`;
-                let restAlarmTimeText = `--`;
-                let totalUsingTime = snsData.totalUsingTime;
-                let totalUsingTimeText = `${((totalUsingTime) / 60000).toFixed(0)} minutes`;
-                if(snsData.lastStartSnsTime > 0)
-                {
-                    totalUsingTime += Date.now() - snsData.lastStartSnsTime;
-                    let restAlarmTime = await getRestAlarmTime();
-                    let nextAlarmTime = Date.now() + restAlarmTime;
-                    let nextAlarmFormatTime = new Date(0);
-                    nextAlarmFormatTime.setMilliseconds(nextAlarmTime);
-                    nextAlarmTimeText = `${nextAlarmFormatTime.toLocaleTimeString("en-US", { hour12: false, hour: '2-digit', minute: '2-digit',})}`;
-                    restAlarmTimeText = `${(restAlarmTime / 60000).toFixed(0)} minutes`;
-                }
-                
-                createMyNotification(
-                    "Status",
-                    `[ SNSData ]\nToday Total SNS Time : ${totalUsingTimeText}\nNext Alarm Time : ${nextAlarmTimeText}\nRest Alarm Time : ${restAlarmTimeText}`,
-                    [{title : "Got it"}]);
-            });
-    });
+    tab => runCritical(async () => showAlarmData(await getAlarmData())));
+
+function showAlarmData(data)
+{
+    createMyNotification(
+        "Time Alarm",
+        `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${data.nextAlarmUsingTime} minutes`,
+        [{title : "Got it"}]);
+}
 
 function createMyNotification(title, message, buttons)
 {
@@ -338,15 +229,3 @@ function createMyNotification(title, message, buttons)
             priority : 2,
         })
 }
-
-chrome.runtime.onSuspend.addListener(
-    () =>
-    {
-        runCritical(
-            async () =>
-            {
-                console.log(`on suspending`);
-                await saveDataAndcleanUp();
-            }
-        )
-    });

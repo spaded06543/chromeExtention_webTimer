@@ -1,3 +1,4 @@
+import { timeSaver } from "./utility.js";
 const targetUrls =
     [
         'https://www.facebook.com/', 
@@ -9,45 +10,6 @@ const targetUrls =
         'https://www.gamer.com.tw/',
         'https://www.ptt.cc/bbs/'
     ];
-const myAlarmName = "mySnsAlarm";
-const alarmTimeInMinutes = 10;
-const snsAlarmDataKey = "snsAlarmData";
-const ticPeriodInMinutes = 0.1;
-
-function getDefaultData()
-{
-    let ret = 
-        {
-            totalUsingTime : 0,
-            nextAlarmUsingTime : alarmTimeInMinutes,
-            updateTime : -1
-        };
-    return ret;
-}
-
-async function getAlarmData()
-{
-    let result = await chrome.storage.local.get();
-    
-    if(result === undefined)
-        return getDefaultData();
-
-    console.log(`get data : ${JSON.stringify(result)}`);
-    
-    return result[snsAlarmDataKey];
-}
-
-async function saveAlarmData(data)
-{
-    data.updateTime = Date.now();
-    let wrapper = {};
-    wrapper[snsAlarmDataKey] = data;
-
-    console.log(`set data : ${JSON.stringify(wrapper)}`);
-    
-
-    await chrome.storage.local.set(wrapper);
-}
 
 function isTargetUrl(url)
 {
@@ -74,15 +36,15 @@ async function updateAlarm(url)
         
         console.log(`Alarm On`);
         chrome.alarms.create(
-            myAlarmName,
+            timeSaver.alarmName,
             {
-                periodInMinutes : ticPeriodInMinutes,
+                periodInMinutes : timeSaver.alarmTimePeriodInMinutes,
             });
     }
     else
     {
         console.log(`Alarm Off`);
-        await chrome.alarms.clear(myAlarmName);
+        await chrome.alarms.clear(timeSaver.alarmName);
     }
 }
 
@@ -104,7 +66,7 @@ runCritical(
         let cleanResult = await chrome.alarms.clearAll();
         console.log(`alarm clean result : ${cleanResult}, number after clear all : ${(await chrome.alarms.getAll()).length}`);
         
-        let alarmData = await getAlarmData();
+        let alarmData = await timeSaver.getAlarmData();
         
         console.log(`initializing data`);
         let timeDiff = Date.now() - alarmData.updateTime;
@@ -113,10 +75,10 @@ runCritical(
         if(alarmData.updateTime > 0 && timeDiff > 18000000)
         {
             console.log(`reset alarm time`);
-            await saveAlarmData(getDefaultData());
+            await timeSaver.saveAlarmData(timeSaver.getDefaultData());
         }
 
-        console.log(`result : ${JSON.stringify(await getAlarmData())}`);
+        console.log(`result : ${JSON.stringify(await timeSaver.getAlarmData())}`);
         console.log(`background initialization finished`);
     });
 
@@ -133,12 +95,12 @@ chrome.alarms.onAlarm.addListener(
                 if(alarmDelayInMinutes >= 0.2)
                     return;
 
-                if(alarm.name !== myAlarmName || currentActivateInfo == undefined)
+                if(alarm.name !== timeSaver.alarmName || currentActivateInfo == undefined)
                     return;
                 
-                let data = await getAlarmData();
+                let data = await timeSaver.getAlarmData();
     
-                data.totalUsingTime += ticPeriodInMinutes;
+                data.totalUsingTime += timeSaver.alarmTimePeriodInMinutes;
 
                 if( alarmDelayInMinutes > 0)
                     data.totalUsingTime += alarmDelayInMinutes ;
@@ -148,13 +110,13 @@ chrome.alarms.onAlarm.addListener(
                     console.log(`on alarm : ${JSON.stringify(alarm)}`);
                 
                     data.nextAlarmUsingTime += 
-                        alarmTimeInMinutes *
-                        Math.ceil((data.totalUsingTime - data.nextAlarmUsingTime) / alarmTimeInMinutes);
+                        timeSaver.alarmTimeInMinutes *
+                        Math.ceil((data.totalUsingTime - data.nextAlarmUsingTime) / timeSaver.alarmTimeInMinutes);
                     
                     showAlarmData(data);
                 }
 
-                await saveAlarmData(data);
+                await timeSaver.saveAlarmData(data);
             })
     });
 
@@ -204,14 +166,19 @@ chrome.tabs.onRemoved.addListener(
             });
     });
 
-chrome.action.onClicked.addListener(
-    tab => runCritical(async () => showAlarmData(await getAlarmData())));
+// chrome.action.onClicked.addListener(
+//     tab => runCritical(async () => showAlarmData(await timeSaver.getAlarmData())));
 
+chrome.runtime.onMessage.addListener(
+    (message, sender, sendResponse) =>
+    {
+        console.log(`On Message : \n${JSON.stringify(message)}\n${JSON.stringify(sender)}`);
+    });
 function showAlarmData(data)
 {
     createMyNotification(
         "Time Alarm",
-        `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${data.nextAlarmUsingTime} minutes`,
+        timeSaver.dataToInfoString(data),
         [{title : "Got it"}]);
 }
 

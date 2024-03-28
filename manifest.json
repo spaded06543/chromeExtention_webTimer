@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "SNS Alarmer",
-  "description": "Showing Popup when using sns too much",
+  "name": "<3 Time saver <3",
+  "description": "Showing notification when you wasting too much time on certain websites",
   "version": "1.0",
   "icons": {
     "16": "images/timer_16.png",
@@ -10,6 +10,7 @@
     "128": "images/timer_128.png"
   },
   "action": {
+    "default_popup": "info.html",
     "default_icon": {
       "16": "images/timer_16.png",
       "32": "images/timer_32.png",

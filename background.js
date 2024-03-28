@@ -166,9 +166,6 @@ chrome.tabs.onRemoved.addListener(
             });
     });
 
-// chrome.action.onClicked.addListener(
-//     tab => runCritical(async () => showAlarmData(await timeSaver.getAlarmData())));
-
 chrome.runtime.onMessage.addListener(
     (message, sender, sendResponse) =>
     {

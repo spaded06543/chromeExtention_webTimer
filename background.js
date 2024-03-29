@@ -75,7 +75,7 @@ runCritical(
         if(alarmData.updateTime > 0 && timeDiff > 18000000)
         {
             console.log(`reset alarm time`);
-            await timeSaver.saveAlarmData(timeSaver.getDefaultData());
+            await timeSaver.saveAlarmData(timeSaver.createDefaultData());
         }
 
         console.log(`result : ${JSON.stringify(await timeSaver.getAlarmData())}`);

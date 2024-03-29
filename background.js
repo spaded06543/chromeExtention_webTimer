@@ -1,35 +1,20 @@
 import { timeSaver } from "./utility.js";
-const targetUrls =
-    [
-        'https://www.facebook.com/', 
-        'https://www.plurk.com/', 
-        'https://twitter.com/', 
-        'https://discord.com/', 
-        'https://www.youtube.com/watch?v=',
-        'https://www.youtube.com/shorts', 
-        'https://www.gamer.com.tw/',
-        'https://www.ptt.cc/bbs/'
-    ];
 
-function isTargetUrl(url)
-{
-    url = url ?? "";
-    let targetSNS = targetUrls.find((v, _, __) => url.startsWith(v));
-    return !(targetSNS === undefined);
-}
+let targetUrls = [];
 
-let previousResult = false;
+const isInTargetUrls = (url) => indexOfUrl(url ?? "") != -1;
+const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
+
+let previousUrl = undefined;
 
 async function updateAlarm(url)
 {
-    let result = isTargetUrl(url);
-    
-    if(previousResult == result)
+    if(previousUrl == url)
         return;
     
-    previousResult = result
+    previousUrl = url
     
-    if(result)
+    if(isInTargetUrls(url))
     {
         if((await chrome.alarms.getAll()).length > 0)
             return;
@@ -63,6 +48,13 @@ runCritical(
     {
         console.log(`background initialization starting...`);
 
+        timeSaver.onLocalStorageUrlListChange.addListener(
+            newUrlList =>
+            {
+                targetUrls = newUrlList;
+                updateAlarm(previousUrl);
+            });
+        
         let cleanResult = await chrome.alarms.clearAll();
         console.log(`alarm clean result : ${cleanResult}, number after clear all : ${(await chrome.alarms.getAll()).length}`);
         
@@ -162,15 +154,10 @@ chrome.tabs.onRemoved.addListener(
                 if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
                     return;
 
-                updateAlarm("");
+                updateAlarm(undefined);
             });
     });
 
-chrome.runtime.onMessage.addListener(
-    (message, sender, sendResponse) =>
-    {
-        console.log(`On Message : \n${JSON.stringify(message)}\n${JSON.stringify(sender)}`);
-    });
 function showAlarmData(data)
 {
     createMyNotification(

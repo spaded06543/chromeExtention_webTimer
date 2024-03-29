@@ -1,61 +1,5 @@
 import { timeSaver } from "./utility.js"
 
-let currentUrlList = undefined;
-function displayTargetUrls(urlList, onRemove) {
-    var arrayContainer = document.getElementById("currentUrls");
-
-    // Clear any existing content in the container
-    arrayContainer.innerHTML = "";
-
-    var ul = document.createElement("ul");
-    
-    urlList.forEach(
-        function(item, index)
-        {
-            var li = document.createElement("li");
-            li.textContent = item + '\n';
-            ul.appendChild(li);
-            var removeButton = document.createElement("button");
-            removeButton.innerText = "remove";
-            removeButton.addEventListener('click', (ev) => onRemove(index));
-            li.appendChild(removeButton);
-        });
-
-    // Append the unordered list to the container
-    arrayContainer.appendChild(ul);
-}
-
-function onRemove(index)
-{
-    currentUrlList.splice(index, 1);
-    displayTargetUrls(currentUrlList, onRemove);
-}
-
-function updateUrls()
-{
-    var inputUrl = document.getElementById('addUrl');
-    
-    if(inputUrl.value != "" && currentUrlList.indexOf(inputUrl.value) == -1)
-    {
-        currentUrlList.push(inputUrl.value);
-        displayTargetUrls(currentUrlList, onRemove);
-    }
-
-    inputUrl.value = "";
-}
-
-function updateAlarmPeriod()
-{
-    var input = document.getElementById('websiteInput').value;
-    var timeThreshold = document.getElementById('timeThresholdInput').value;
-    chrome.storage.sync.set({
-        'website': input,
-        'timeThreshold': timeThreshold
-    }, function () {
-        console.log("alarm period updated");
-    });
-}
-
 let dataPromise = undefined;
 async function updateInfoString()
 {
@@ -69,12 +13,50 @@ async function updateInfoString()
 
 (async function()
 {
-    document.getElementById("updateUrls").addEventListener("click", updateUrls);
-    document.getElementById("updateAlarmPeriod").addEventListener("click", updateAlarmPeriod);
+    document
+        .getElementById("updateUrls")
+        .addEventListener("click", (ev) =>
+            {
+                var inputUrl = document.getElementById('addUrl');
+                timeSaver.addUrl(inputUrl.value);
+                inputUrl.value = "";
+            });
+    document
+        .getElementById("updateAlarmPeriod")
+        .addEventListener("click", (ev) =>
+            {
+                var input = document.getElementById('websiteInput').value;
+                var timeThreshold = document.getElementById('timeThresholdInput').value;
+            });
     
-    currentUrlList = await timeSaver.getUrlList();
-    // Call the function to display the array when the page loads
-    displayTargetUrls(currentUrlList, onRemove);
+    timeSaver
+        .onLocalStorageUrlListChange
+        .addListener(urlList => 
+            {
+                console.log(`on list changed :\n${JSON.stringify(urlList)}`);
+                var arrayContainer = document.getElementById("currentUrls");
+            
+                // Clear any existing content in the container
+                arrayContainer.innerHTML = "";
+            
+                var ul = document.createElement("ul");
+                
+                urlList.forEach(
+                    (item) =>
+                    {
+                        var li = document.createElement("li");
+                        li.textContent = item + '\n';
+                        ul.appendChild(li);
+                        var removeButton = document.createElement("button");
+                        removeButton.innerText = "remove";
+                        removeButton.addEventListener('click', (ev) => timeSaver.removeUrl(item));
+                        li.appendChild(document.createElement("br"));
+                        li.appendChild(removeButton);
+                    });
+            
+                // Append the unordered list to the container
+                arrayContainer.appendChild(ul);
+            });
 
     updateInfoString();
     setInterval(updateInfoString, 60000)

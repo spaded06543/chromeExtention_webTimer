@@ -9,7 +9,7 @@ let openUrlTime = -1;
 let cacheData = undefined;
 let previousUrl = undefined;
 
-async function updateAlarm(url)
+function updateAlarm(url)
 {
     if(isInTargetUrls(url))
         openUrlTime = Date.now();
@@ -20,32 +20,22 @@ async function updateAlarm(url)
     previousUrl = url;
 }
 
-let executingTask = undefined;
-async function runCritical(task)
-{
-    if(!(executingTask === undefined))
-        await executingTask
-    executingTask = task();
-    await executingTask;
-    executingTask = undefined;
-}
 
-runCritical(
-    async () =>
+timeSaver.onLocalStorageUrlListChange.addListener(
+    newUrlList =>
     {
-        console.log(`background initialization starting...`);
+        targetUrls = newUrlList;
+        updateAlarm(previousUrl);
+    });
 
-        timeSaver.onLocalStorageUrlListChange.addListener(
-            newUrlList =>
-            {
-                targetUrls = newUrlList;
-                updateAlarm(previousUrl);
-            });
+const initialization = 
+    (async () =>
+    {
+        console.log(`begin data initialization`);
         
         cacheData = await timeSaver.getAlarmData();
-        
-        console.log(`initializing data`);
         let timeDiff = Date.now() - cacheData.updateTime;
+        
         console.log(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
         
         if(cacheData.updateTime > 0 && timeDiff > 18000000)
@@ -55,35 +45,33 @@ runCritical(
         }
 
         console.log(`result : ${JSON.stringify(cacheData)}`);
-        console.log(`background initialization finished`);
-    });
+        console.log(`data initialization finished`);
+    })();
 
 chrome.alarms.onAlarm.addListener(
-    (alarm) =>
+    async (alarm) =>
     {
-        runCritical(
-            async () =>
-            {
-                if((!cacheData) || openUrlTime == -1 || currentActivateInfo == undefined)
+        await initialization;
+        
+        if((!cacheData) || openUrlTime == -1 || currentActivateInfo == undefined)
                     return;
                 
-                var currentTime = Date.now();
-                cacheData.totalUsingTime += (currentTime - openUrlTime) / 60000;
-                openUrlTime = currentTime;
+        var currentTime = Date.now();
+        cacheData.totalUsingTime += (currentTime - openUrlTime) / 60000;
+        openUrlTime = currentTime;
 
-                if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
-                {
-                    console.log(`on alarm : ${JSON.stringify(alarm)}`);
-                
-                    cacheData.nextAlarmUsingTime += 
-                        timeSaver.alarmTimeInMinutes *
-                        Math.ceil((cacheData.totalUsingTime - cacheData.nextAlarmUsingTime) / timeSaver.alarmTimeInMinutes);
-                    
-                    showAlarmData(cacheData);
-                }
+        if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
+        {
+            console.log(`on alarm : ${JSON.stringify(alarm)}`);
+        
+            cacheData.nextAlarmUsingTime += 
+                timeSaver.alarmTimeInMinutes *
+                Math.ceil((cacheData.totalUsingTime - cacheData.nextAlarmUsingTime) / timeSaver.alarmTimeInMinutes);
+            
+            showAlarmData(cacheData);
+        }
 
-                await timeSaver.saveAlarmData(cacheData);
-            })
+        await timeSaver.saveAlarmData(cacheData);
     });
 
 let currentActivateInfo = undefined;
@@ -105,31 +93,23 @@ chrome.tabs.onActivated.addListener(
 chrome.tabs.onUpdated.addListener(
     (tabId, changeInfo, tab) =>
     {
-        runCritical(
-            async () =>
-            {
-                if (changeInfo.status != "complete")
-                    return;
-                console.log(`update tag, tabId : ${tabId}\ntitle : ${tab.title}\nurl : ${tab.url}`)
-                
-                if(currentActivateInfo !== undefined && tabId == currentActivateInfo.tabId)
-                    await updateAlarm(tab.url);
-            });
+        if (changeInfo.status != "complete")
+            return;
+        console.log(`update tag, tabId : ${tabId}\ntitle : ${tab.title}\nurl : ${tab.url}`)
+        
+        if(currentActivateInfo !== undefined && tabId == currentActivateInfo.tabId)
+            updateAlarm(tab.url);
     });
 
 chrome.tabs.onRemoved.addListener(
     (tabId, removeInfo) =>
     {
-        runCritical(
-            async () =>
-            {
-                console.log(`closing tab : ${tabId}`);
+        console.log(`closing tab : ${tabId}`);
         
-                if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
-                    return;
+        if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
+            return;
 
-                updateAlarm(undefined);
-            });
+        updateAlarm(undefined);
     });
 
 function showAlarmData(data)

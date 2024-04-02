@@ -67,7 +67,9 @@ chrome.alarms.onAlarm.addListener(
                 if((!cacheData) || openUrlTime == -1 || currentActivateInfo == undefined)
                     return;
                 
-                cacheData.totalUsingTime += (Date.now() - openUrlTime) / 60000;
+                var currentTime = Date.now();
+                cacheData.totalUsingTime += (currentTime - openUrlTime) / 60000;
+                openUrlTime = currentTime;
 
                 if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
                 {

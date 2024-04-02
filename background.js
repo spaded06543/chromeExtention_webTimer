@@ -77,17 +77,13 @@ chrome.alarms.onAlarm.addListener(
 let currentActivateInfo = undefined;
 
 chrome.tabs.onActivated.addListener(
-    activateInfo =>
+    async activateInfo =>
     {
-        runCritical(
-            async () =>
-            {
-                currentActivateInfo = activateInfo;
-                console.debug(`activateTab : ${JSON.stringify(currentActivateInfo)}`)
-                let tabInfo = await chrome.tabs.get(activateInfo.tabId);
-                
-                await updateAlarm(tabInfo.url);
-            });
+        currentActivateInfo = activateInfo;
+        console.debug(`activateTab : ${JSON.stringify(currentActivateInfo)}`)
+        let tabInfo = await chrome.tabs.get(activateInfo.tabId);
+        
+        updateAlarm(tabInfo.url);
     });
 
 chrome.tabs.onUpdated.addListener(

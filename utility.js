@@ -5,6 +5,7 @@ export const timeSaver = (
         const updateTimeKey = "updateTime";
         const totalUsingTimeKey = "totalUsingTime";
         const nextAlarmUsingTimeKey = "nextAlarmUsingTime";
+        const alarmTimePeriodInMinutes = 0.1;
         
         function createDefaultData() {
             return {
@@ -34,6 +35,19 @@ export const timeSaver = (
         }
 
         let urlListCache = [];
+
+        chrome.alarms.getAll().then(
+            alarms =>
+            {
+                if(alarms.length == 0)
+                {
+                    chrome.alarms.create(
+                        timeSaver.alarmName,
+                        {
+                            periodInMinutes : alarmTimePeriodInMinutes,
+                        });
+                }
+            });
         
         chrome.storage.local
             .get(rawUrlListKey)
@@ -85,7 +99,6 @@ export const timeSaver = (
         return {
             alarmName: "mySnsAlarm",
             alarmTimeInMinutes: 10,
-            alarmTimePeriodInMinutes: 0.1,
             createDefaultData: createDefaultData,
             getAlarmData: getAlarmData,
             saveAlarmData: saveAlarmData,

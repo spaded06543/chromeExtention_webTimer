@@ -2,35 +2,22 @@ import { timeSaver } from "./utility.js";
 
 let targetUrls = [];
 
-const isInTargetUrls = (url) => indexOfUrl(url ?? "") != -1;
+const isInTargetUrls = (url) => url && indexOfUrl(url ?? "") != -1;
 const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
 
+let openUrlTime = -1;
+let cacheData = undefined;
 let previousUrl = undefined;
 
 async function updateAlarm(url)
 {
-    if(previousUrl == url)
-        return;
-    
-    previousUrl = url
-    
     if(isInTargetUrls(url))
-    {
-        if((await chrome.alarms.getAll()).length > 0)
-            return;
-        
-        console.log(`Alarm On`);
-        chrome.alarms.create(
-            timeSaver.alarmName,
-            {
-                periodInMinutes : timeSaver.alarmTimePeriodInMinutes,
-            });
-    }
+        openUrlTime = Date.now();
     else
     {
-        console.log(`Alarm Off`);
-        await chrome.alarms.clear(timeSaver.alarmName);
+        openUrlTime = -1;
     }
+    previousUrl = url;
 }
 
 let executingTask = undefined;
@@ -55,22 +42,19 @@ runCritical(
                 updateAlarm(previousUrl);
             });
         
-        let cleanResult = await chrome.alarms.clearAll();
-        console.log(`alarm clean result : ${cleanResult}, number after clear all : ${(await chrome.alarms.getAll()).length}`);
-        
-        let alarmData = await timeSaver.getAlarmData();
+        cacheData = await timeSaver.getAlarmData();
         
         console.log(`initializing data`);
-        let timeDiff = Date.now() - alarmData.updateTime;
+        let timeDiff = Date.now() - cacheData.updateTime;
         console.log(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
         
-        if(alarmData.updateTime > 0 && timeDiff > 18000000)
+        if(cacheData.updateTime > 0 && timeDiff > 18000000)
         {
             console.log(`reset alarm time`);
-            await timeSaver.saveAlarmData(timeSaver.createDefaultData());
+            cacheData = timeSaver.createDefaultData();
         }
 
-        console.log(`result : ${JSON.stringify(await timeSaver.getAlarmData())}`);
+        console.log(`result : ${JSON.stringify(cacheData)}`);
         console.log(`background initialization finished`);
     });
 
@@ -80,35 +64,23 @@ chrome.alarms.onAlarm.addListener(
         runCritical(
             async () =>
             {
-                let alarmDelayInMinutes = (Date.now() - alarm.scheduledTime) / 60000;
-                
-                //set a threshold to skip unexpected alarm from previous start up.
-                console.log(`alarm delay: ${alarmDelayInMinutes}`);
-                if(alarmDelayInMinutes >= 0.2)
-                    return;
-
-                if(alarm.name !== timeSaver.alarmName || currentActivateInfo == undefined)
+                if((!cacheData) || openUrlTime == -1 || currentActivateInfo == undefined)
                     return;
                 
-                let data = await timeSaver.getAlarmData();
-    
-                data.totalUsingTime += timeSaver.alarmTimePeriodInMinutes;
+                cacheData.totalUsingTime += (Date.now() - openUrlTime) / 60000;
 
-                if( alarmDelayInMinutes > 0)
-                    data.totalUsingTime += alarmDelayInMinutes ;
-
-                if(data.totalUsingTime >= data.nextAlarmUsingTime)
+                if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
                 {
                     console.log(`on alarm : ${JSON.stringify(alarm)}`);
                 
-                    data.nextAlarmUsingTime += 
+                    cacheData.nextAlarmUsingTime += 
                         timeSaver.alarmTimeInMinutes *
-                        Math.ceil((data.totalUsingTime - data.nextAlarmUsingTime) / timeSaver.alarmTimeInMinutes);
+                        Math.ceil((cacheData.totalUsingTime - cacheData.nextAlarmUsingTime) / timeSaver.alarmTimeInMinutes);
                     
-                    showAlarmData(data);
+                    showAlarmData(cacheData);
                 }
 
-                await timeSaver.saveAlarmData(data);
+                await timeSaver.saveAlarmData(cacheData);
             })
     });
 

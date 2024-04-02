@@ -31,21 +31,21 @@ timeSaver.onLocalStorageUrlListChange.addListener(
 const initialization = 
     (async () =>
     {
-        console.log(`begin data initialization`);
+        console.debug(`begin data initialization`);
         
         cacheData = await timeSaver.getAlarmData();
         let timeDiff = Date.now() - cacheData.updateTime;
         
-        console.log(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
+        console.debug(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
         
         if(cacheData.updateTime > 0 && timeDiff > 18000000)
         {
-            console.log(`reset alarm time`);
+            console.debug(`reset alarm time`);
             cacheData = timeSaver.createDefaultData();
         }
 
-        console.log(`result : ${JSON.stringify(cacheData)}`);
-        console.log(`data initialization finished`);
+        console.debug(`result : ${JSON.stringify(cacheData)}`);
+        console.debug(`data initialization finished`);
     })();
 
 chrome.alarms.onAlarm.addListener(
@@ -54,7 +54,7 @@ chrome.alarms.onAlarm.addListener(
         await initialization;
         
         if((!cacheData) || openUrlTime == -1 || currentActivateInfo == undefined)
-                    return;
+            return;
                 
         var currentTime = Date.now();
         cacheData.totalUsingTime += (currentTime - openUrlTime) / 60000;
@@ -62,7 +62,7 @@ chrome.alarms.onAlarm.addListener(
 
         if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
         {
-            console.log(`on alarm : ${JSON.stringify(alarm)}`);
+            console.debug(`on alarm : ${JSON.stringify(alarm)}`);
         
             cacheData.nextAlarmUsingTime += 
                 timeSaver.alarmTimeInMinutes *
@@ -83,7 +83,7 @@ chrome.tabs.onActivated.addListener(
             async () =>
             {
                 currentActivateInfo = activateInfo;
-                console.log(`activateTab : ${JSON.stringify(currentActivateInfo)}`)
+                console.debug(`activateTab : ${JSON.stringify(currentActivateInfo)}`)
                 let tabInfo = await chrome.tabs.get(activateInfo.tabId);
                 
                 await updateAlarm(tabInfo.url);
@@ -95,7 +95,7 @@ chrome.tabs.onUpdated.addListener(
     {
         if (changeInfo.status != "complete")
             return;
-        console.log(`update tag, tabId : ${tabId}\ntitle : ${tab.title}\nurl : ${tab.url}`)
+        console.debug(`update tag, tabId : ${tabId}\ntitle : ${tab.title}\nurl : ${tab.url}`)
         
         if(currentActivateInfo !== undefined && tabId == currentActivateInfo.tabId)
             updateAlarm(tab.url);
@@ -104,7 +104,7 @@ chrome.tabs.onUpdated.addListener(
 chrome.tabs.onRemoved.addListener(
     (tabId, removeInfo) =>
     {
-        console.log(`closing tab : ${tabId}`);
+        console.debug(`closing tab : ${tabId}`);
         
         if(currentActivateInfo === undefined || currentActivateInfo.tabId != tabId)
             return;
@@ -122,7 +122,7 @@ function showAlarmData(data)
 
 function createMyNotification(title, message, buttons)
 {
-    console.log(`title : ${title}\nmessage : ${message}`);
+    console.debug(`title : ${title}\nmessage : ${message}`);
     chrome.notifications.create(
         'mySnsAlarm',
         {

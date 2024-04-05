@@ -47,7 +47,7 @@ timeSaver.onLocalStorageUrlListChange.addListener(
     newUrlList =>
     {
         targetUrls = newUrlList;
-        console.info(`new list :\n${JSON.stringify(newUrlList)}`);
+        console.debug(`new list :\n${JSON.stringify(newUrlList)}`);
         updateData();
     });
 

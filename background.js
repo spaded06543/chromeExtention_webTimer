@@ -75,7 +75,7 @@ async function updateData()
 
     if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
     {
-        console.debug(`on alarm : ${JSON.stringify(alarm)}`);
+        console.debug(`on alarm : ${JSON.stringify(cacheData)}`);
     
         cacheData.nextAlarmUsingTime += 
             timeSaver.alarmTimeInMinutes *

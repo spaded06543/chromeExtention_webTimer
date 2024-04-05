@@ -73,8 +73,12 @@ export const timeSaver = (
             .onChanged
             .addListener((changes) =>
                 {
-                    if (changes[rawUrlListKey] !== undefined)
+                    let targetChange = changes[rawUrlListKey];
+                    if (targetChange !== undefined)
+                    {
+                        urlListCache = JSON.parse(targetChange.newValue);
                         broadcastNewUrlList(urlListCache);
+                    }
                 });
 
         let changeListeners = [];

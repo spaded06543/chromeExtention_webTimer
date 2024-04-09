@@ -1,7 +1,7 @@
 export const timeSaver = (
     function () {
         const alarmDataKey = "snsAlarmData";
-        const rawUrlListKey = "rawData";
+        const urlListKey = "rawData";
         const updateTimeKey = "updateTime";
         const totalUsingTimeKey = "totalUsingTime";
         const nextAlarmUsingTimeKey = "nextAlarmUsingTime";
@@ -50,33 +50,23 @@ export const timeSaver = (
             });
         
         chrome.storage.local
-            .get(rawUrlListKey)
-            .then((rawData) =>
+            .get(urlListKey)
+            .then((result) =>
                 {
-                    try
-                    {
-                        var context = rawData[rawUrlListKey];
-                        if(context !== undefined)
-                            urlListCache = JSON.parse(context);
-                    }
-                    catch(error)
-                    {
-                        console.log(`error on getting local url list\n=====\n${error}\n=====`);
-                        urlListCache = [];
-                    }
+                    urlListCache = result[urlListKey] ?? [];
                     broadcastNewUrlList(urlListCache);
                 });
         
-        var saveUrlCache = () => chrome.storage.local.set({ [rawUrlListKey] : JSON.stringify(urlListCache) });
+        var saveUrlCache = () => chrome.storage.local.set({ [urlListKey] : urlListCache });
         var broadcastNewUrlList = () => changeListeners.forEach(callBack => callBack(urlListCache));
         chrome.storage.local
             .onChanged
             .addListener((changes) =>
                 {
-                    let targetChange = changes[rawUrlListKey];
+                    let targetChange = changes[urlListKey];
                     if (targetChange !== undefined)
                     {
-                        urlListCache = JSON.parse(targetChange.newValue);
+                        urlListCache = targetChange.newValue;
                         broadcastNewUrlList(urlListCache);
                     }
                 });

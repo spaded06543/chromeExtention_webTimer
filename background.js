@@ -35,6 +35,7 @@ const dataInit =
         {
             console.debug(`reset alarm time`);
             cacheData = timeSaver.createDefaultData();
+            timeSaver.saveAlarmData(cacheData);
         }
 
         console.debug(`result : ${JSON.stringify(cacheData)}`);

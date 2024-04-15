@@ -1,94 +1,25 @@
-import { timeSaver } from "./utility.js";
+import { AlarmData, timeSaverInitializationPromise } from "./utility.js";
 
-let targetUrls = [];
-
-const isInTargetUrls = (url) => url && indexOfUrl(url ?? "") != -1;
-const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
-
-let prevOpenTime = -1;
-let cacheData = undefined;
-let tabUrlMap = {};
-let currentTabId = undefined;
-
-const currentTabIdInit = 
-    (async () =>
+chrome.alarms.getAll().then(
+    alarms =>
     {
-        let currentTab = await chrome.tabs.query({'active': true, 'lastFocusedWindow': true, 'currentWindow': true});
-        if(currentTab !== undefined && currentTab.length != 0)
-            currentTabId = currentTab[0].id;
-    })();
-
-const tabUrlMapInit = 
-    chrome.tabs.query({}, tabs => tabUrlMap = Object.fromEntries(tabs.map(t => [t.id, t.url])));
-
-const dataInit = 
-    (async () =>
-    {
-        console.debug(`begin data initialization`);
-        
-        cacheData = await timeSaver.getAlarmData();
-        let timeDiff = Date.now() - cacheData.updateTime;
-        
-        console.debug(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
-        
-        if(cacheData.updateTime > 0 && timeDiff > 18000000)
+        if(alarms.length == 0)
         {
-            console.debug(`reset alarm time`);
-            cacheData = timeSaver.createDefaultData();
-            timeSaver.saveAlarmData(cacheData);
+            chrome.alarms.create(
+                timeSaver.alarmName,
+                {
+                    periodInMinutes : 0.1,
+                });
         }
-
-        console.debug(`result : ${JSON.stringify(cacheData)}`);
-        console.debug(`data initialization finished`);
-    })();
-
-let init = Promise.all([currentTabIdInit, dataInit, tabUrlMapInit]);
-
-timeSaver.onLocalStorageUrlListChange.addListener(
-    newUrlList =>
-    {
-        targetUrls = newUrlList;
-        console.debug(`new list :\n${JSON.stringify(newUrlList)}`);
-        updateData();
     });
 
-async function updateData()
-{
-    await init;
-
-    console.debug(`current tab ${currentTabId}, url : ${tabUrlMap[currentTabId]}`);
-
-    if(!isInTargetUrls(tabUrlMap[currentTabId]))
-    {
-        prevOpenTime = -1;
-        return;
-    }
-    
-    if(prevOpenTime == -1)
-    {
-        prevOpenTime = Date.now();
-        return;
-    }
-
-    var currentTime = Date.now();
-    cacheData.totalUsingTime += (currentTime - prevOpenTime) / 60000;
-    prevOpenTime = currentTime;
-
-    if(cacheData.totalUsingTime >= cacheData.nextAlarmUsingTime)
-    {
-        console.debug(`on alarm : ${JSON.stringify(cacheData)}`);
-    
-        cacheData.nextAlarmUsingTime += 
-            timeSaver.alarmTimeInMinutes *
-            Math.ceil((cacheData.totalUsingTime - cacheData.nextAlarmUsingTime) / timeSaver.alarmTimeInMinutes);
-        
-        showAlarmData(cacheData);
-    }
-
-    await timeSaver.saveAlarmData(cacheData);
-}
+let updateData = () => {};
 
 chrome.alarms.onAlarm.addListener((alarm) => updateData());
+
+
+let tabUrlMap = {};
+let currentTabId = undefined;
 
 chrome.tabs.onActivated.addListener(
     async activateInfo =>
@@ -118,13 +49,93 @@ chrome.tabs.onRemoved.addListener(
         updateData();
     });
 
-function showAlarmData(data)
+const currentTabIdInit = 
+    (async () =>
+    {
+        let currentTab = await chrome.tabs.query({'active': true, 'lastFocusedWindow': true, 'currentWindow': true});
+        if(currentTab !== undefined && currentTab.length != 0)
+            currentTabId = currentTab[0].id;
+    })();
+
+const tabUrlMapInit = 
+    chrome.tabs.query({}, tabs => tabUrlMap = Object.fromEntries(tabs.map(t => [t.id, t.url])));
+
+
+(async () =>
 {
-    createMyNotification(
-        "Time Alarm",
-        timeSaver.dataToInfoString(data),
-        [{title : "Got it"}]);
-}
+    console.debug(`Worker initialization`);
+
+    await Promise.all([currentTabIdInit, tabUrlMapInit]);
+    const timeSaver = await timeSaverInitializationPromise;
+    const alarmDataHandler = timeSaver.dataHandler.alarmData;
+    const urlListHandler = timeSaver.dataHandler.urlList;
+    const alarmPeriodHandler = timeSaver.dataHandler.alarmPeriod;
+    
+    const cacheData = new AlarmData();
+    const timeDiff = Date.now() - cacheData.updateTime;
+    console.debug(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
+    
+    if(cacheData.updateTime > 0 && timeDiff > 18000000)
+    {
+        console.debug(`reset alarm time`);
+        cacheData = new AlarmData();
+        alarmDataHandler.setValue(cacheData);
+    }
+    
+    console.debug(`result : ${JSON.stringify(cacheData)}`);
+
+    alarmPeriodHandler.addListener((oldPeriod, newPeriod) => updateData());
+    
+    let targetUrls = [];
+    urlListHandler.onUpdated.addListener(
+        (oldValue, newValue) =>
+        {
+            targetUrls = newValue;
+            console.debug(`new list :\n${JSON.stringify(newValue)}`);
+            updateData();
+        });
+    
+    let prevOpenTime = -1;
+
+    const isInTargetUrls = (url) => url && indexOfUrl(url ?? "") != -1;
+    const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
+
+    updateData = async () =>
+    {
+        console.debug(`current tab ${currentTabId}, url : ${tabUrlMap[currentTabId]}`);
+
+        if(!isInTargetUrls(tabUrlMap[currentTabId]))
+        {
+            prevOpenTime = -1;
+            return;
+        }
+        
+        if(prevOpenTime == -1)
+        {
+            prevOpenTime = Date.now();
+            return;
+        }
+
+        var currentTime = Date.now();
+        cacheData.updateTime = currentTime;
+        cacheData.totalUsingTime += (currentTime - prevOpenTime) / 60000;
+        prevOpenTime = currentTime;
+
+        if(cacheData.totalUsingTime >= cacheData.lastAlarmTime + alarmPeriodHandler.value)
+        {
+            console.debug(`on alarm : ${JSON.stringify(cacheData)}`);
+        
+            cacheData.lastAlarmTime = cacheData.totalUsingTime;
+            createMyNotification(
+                "Time Alarm",
+                timeSaver.dataToInfoString(cacheData, alarmPeriodHandler.value),
+                [{title : "Got it"}])
+        }
+
+        timeSaver.saveAlarmData(cacheData);
+    };
+    console.debug(`Worker initialization finished`);
+})();
 
 function createMyNotification(title, message, buttons)
 {

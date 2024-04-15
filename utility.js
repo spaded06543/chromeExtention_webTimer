@@ -1,120 +1,75 @@
-export const timeSaver = (
-    function () {
-        const alarmDataKey = "snsAlarmData";
-        const urlListKey = "rawData";
-        const updateTimeKey = "updateTime";
-        const totalUsingTimeKey = "totalUsingTime";
-        const nextAlarmUsingTimeKey = "nextAlarmUsingTime";
-        const alarmTimePeriodInMinutes = 0.1;
-        
-        function createDefaultData() {
-            return {
-                [totalUsingTimeKey]: 0,
-                [nextAlarmUsingTimeKey]: timeSaver.alarmTimeInMinutes,
-                [updateTimeKey]: -1
-            };
-        }
+export function AlarmData() {
+    this.totalUsingTime = 0;
+    this.lastAlarmTime = 0;
+    this.updateTime = -1;
+};
 
-        async function getAlarmData() {
-            let result = await chrome.storage.local.get(alarmDataKey);
-
-            if (Object.keys(result).length == 0)
-                return createDefaultData();
-
-            console.log(`get data : ${JSON.stringify(result)}`);
-
-            return result[alarmDataKey];
-        }
-
-        function saveAlarmData(data) {
-            data.updateTime = Date.now();
-
-            console.log(`set data : ${JSON.stringify(data)}`);
-
-            return chrome.storage.local.set({[alarmDataKey] : data});
-        }
-
-        let urlListCache = [];
-
-        chrome.alarms.getAll().then(
-            alarms =>
-            {
-                if(alarms.length == 0)
-                {
-                    chrome.alarms.create(
-                        timeSaver.alarmName,
-                        {
-                            periodInMinutes : alarmTimePeriodInMinutes,
-                        });
-                }
-            });
-        
-        chrome.storage.local
-            .get(urlListKey)
-            .then((result) =>
-                {
-                    urlListCache = result[urlListKey] ?? [];
-                    broadcastNewUrlList(urlListCache);
-                });
-        
-        var saveUrlCache = () => chrome.storage.local.set({ [urlListKey] : urlListCache });
-        var broadcastNewUrlList = () => changeListeners.forEach(callBack => callBack(urlListCache));
-        chrome.storage.local
-            .onChanged
-            .addListener((changes) =>
-                {
-                    let targetChange = changes[urlListKey];
-                    if (targetChange !== undefined)
+export const timeSaverInitializationPromise = (
+    async function () {
+        function ValueHandler(key, value)
+        {
+            this.key = key;
+            this.value = value;
+            this.listeners = [];
+            chrome.storage.local
+                .onChanged
+                .addListener((changes) =>
                     {
-                        urlListCache = targetChange.newValue;
-                        broadcastNewUrlList(urlListCache);
-                    }
-                });
+                        let targetChange = changes[key];
+                        if (targetChange !== undefined)
+                        {
+                            this.value = targetChange.newValue;
+                            this.listeners.foreach(callBack => callBack(targetChange.oldValue, targetChange.newValue));
+                        }
+                    });
+        };
 
-        let changeListeners = [];
+        ValueHandler.prototype = 
+            {
+                addListener: (newListener) =>
+                {
+                    if (listeners.indexOf(newListener) != -1)
+                        return;
+                    listeners.push(newListener);
+                },
+                removeListener: (target) =>
+                {
+                    var listenerIndex = listeners.indexOf(target);
+                    if (listenerIndex == -1)
+                        return;
+                    listeners.slice(listenerIndex, 1);
+                },
+                setValue: (newValue) =>
+                {
+                    console.debug(`save <${this.key}> : ${JSON.stringify(newValue)}`);
+                    return chrome.storage.local.set({[this.key] : newValue});
+                }
+            };
 
-        function addUrlChangedEventListener(callBack)
+        async function createValueHandler(key, defaultValue)
         {
-            if (changeListeners.indexOf(callBack) != -1)
-                return;
-            changeListeners.push(callBack);
-            callBack(urlListCache);
+            let value = (await chrome.storage.local.get(key))[key];
+            return new ValueHandler(key, value ?? defaultValue);
         }
 
-        function removeUrlChangedEventListener(callBack)
-        {
-            var listenerIndex = changeListeners.indexOf(callBack);
-            if (listenerIndex == -1)
-                return;
-            changeListeners.slice(listenerIndex, 1);
-        }
-
+        let dataHandlers = await Promise.all(
+            [
+                createValueHandler("alarmPeriod", 10),
+                createValueHandler("rawData", []),
+                createValueHandler("snsAlarmData", new AlarmData())
+            ]);
+        
 
         return {
             alarmName: "mySnsAlarm",
             alarmTimeInMinutes: 10,
-            createDefaultData: createDefaultData,
-            getAlarmData: getAlarmData,
-            saveAlarmData: saveAlarmData,
-            dataToInfoString: (data) => `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${data.nextAlarmUsingTime} minutes`,
-            addUrl: async (addedUrl) =>
+            createDefaultAlarmData: createDefaultAlarmData,
+            dataToInfoString: (data, alarmPeriod) => `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${data.nextAlarmUsingTime + alarmPeriod} minutes`,
+            dataHandler:  
                 {
-                    if(urlListCache.indexOf(addedUrl) != -1)
-                        return;
-                    urlListCache.push(addedUrl);
-                    await saveUrlCache();
+                    alarmPeriod: dataHandlers[0],
+                    urlList: dataHandlers[1],
+                    alarmData: dataHandlers[2]
                 },
-            removeUrl: async (removedUrl) =>
-                {
-                    var targetIndex = urlListCache.indexOf(removedUrl);
-                    if(targetIndex == -1)
-                        return;
-                    urlListCache.splice(targetIndex, 1);
-                    await saveUrlCache();
-                },
-            onLocalStorageUrlListChange:{
-                addListener: addUrlChangedEventListener,
-                removeListener: removeUrlChangedEventListener 
-            }
         };
     })();

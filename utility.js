@@ -28,16 +28,16 @@ export const timeSaverInitializationPromise = (
             {
                 addListener: (newListener) =>
                 {
-                    if (listeners.indexOf(newListener) != -1)
+                    if (this.listeners.indexOf(newListener) != -1)
                         return;
-                    listeners.push(newListener);
+                    this.listeners.push(newListener);
                 },
                 removeListener: (target) =>
                 {
-                    var listenerIndex = listeners.indexOf(target);
+                    var listenerIndex = this.listeners.indexOf(target);
                     if (listenerIndex == -1)
                         return;
-                    listeners.slice(listenerIndex, 1);
+                    this.listeners.slice(listenerIndex, 1);
                 },
                 setValue: (newValue) =>
                 {

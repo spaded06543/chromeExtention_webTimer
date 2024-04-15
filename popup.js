@@ -17,7 +17,7 @@ import { timeSaverInitializationPromise } from "./utility.js";
         var ul = document.createElement("ul");
         
         list.forEach(
-            (item) =>
+            function(item)
             {
                 var li = document.createElement("li");
                 li.textContent = item + '\n';
@@ -36,7 +36,7 @@ import { timeSaverInitializationPromise } from "./utility.js";
     renderUrlList(urlListCache);
     
     urlList.addListener(
-        (oldValue, newValue) => 
+        function(oldValue, newValue) 
         {
             urlListCache = newValue;
             console.log(`on list changed :\n${JSON.stringify(urlListCache)}`);
@@ -48,7 +48,7 @@ import { timeSaverInitializationPromise } from "./utility.js";
         if(urlListCache.indexOf(addedUrl) != -1)
             return;
         urlListCache.push(addedUrl);
-        urlList.setValue(urlListCache);
+        urlList.saveValue(urlListCache);
     };
 
     async function removeUrl(removedUrl)
@@ -57,12 +57,12 @@ import { timeSaverInitializationPromise } from "./utility.js";
         if(targetIndex == -1)
             return;
         urlListCache.splice(targetIndex, 1);
-        urlList.setValue(urlListCache);
+        urlList.saveValue(urlListCache);
     };
     
     document
         .getElementById("updateUrls")
-        .addEventListener("click", (ev) =>
+        .addEventListener("click", function(ev)
             {
                 var inputUrl = document.getElementById('addUrl');
                 addUrl(inputUrl.value);
@@ -71,16 +71,16 @@ import { timeSaverInitializationPromise } from "./utility.js";
     
     document.getElementById('alarmPeriod').value = alarmPeriod.value.toString();
     alarmPeriod.addListener(
-        (oldValue, newValue) =>
+        function(oldValue, newValue)
         {
             document.getElementById('alarmPeriod').value = newValue;
         });
 
     document
         .getElementById("updateAlarmPeriod")
-        .addEventListener("click", (ev) =>
+        .addEventListener("click", function(ev)
             {
-                var timeThreshold = parseFloat(document.getElementById('timeThresholdInput').value);
+                var timeThreshold = parseFloat(document.getElementById('alarmPeriod').value);
                 
                 if(timeThreshold === NaN || timeThreshold <= 0)
                 {
@@ -88,7 +88,7 @@ import { timeSaverInitializationPromise } from "./utility.js";
                     return;
                 }
                 
-                alarmPeriod.setValue(timeThreshold);
+                alarmPeriod.saveValue(timeThreshold);
             });
     
     function updateInfoString()

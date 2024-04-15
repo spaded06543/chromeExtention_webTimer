@@ -22,7 +22,7 @@ let tabUrlMap = {};
 let currentTabId = undefined;
 
 chrome.tabs.onActivated.addListener(
-    async activateInfo =>
+    async function(activateInfo)
     {
         currentTabId = activateInfo.tabId;
         console.debug(`activateTabId : ${currentTabId}`);
@@ -30,7 +30,7 @@ chrome.tabs.onActivated.addListener(
     });
 
 chrome.tabs.onUpdated.addListener(
-    (tabId, changeInfo, tab) =>
+    function(tabId, changeInfo, tab)
     {
         if (changeInfo.status != "complete")
             return;
@@ -40,7 +40,7 @@ chrome.tabs.onUpdated.addListener(
     });
 
 chrome.tabs.onRemoved.addListener(
-    (tabId, removeInfo) =>
+    function(tabId, removeInfo)
     {
         console.debug(`closing tab : ${tabId}`);
         
@@ -61,7 +61,7 @@ const tabUrlMapInit =
     chrome.tabs.query({}, tabs => tabUrlMap = Object.fromEntries(tabs.map(t => [t.id, t.url])));
 
 
-(async () =>
+(async function()
 {
     console.debug(`Worker initialization`);
 
@@ -71,22 +71,22 @@ const tabUrlMapInit =
     const urlListHandler = timeSaver.dataHandler.urlList;
     const alarmPeriodHandler = timeSaver.dataHandler.alarmPeriod;
     
-    const cacheData = new AlarmData();
-    const timeDiff = Date.now() - cacheData.updateTime;
+    const alarmDataCache = alarmDataHandler.value;
+    const timeDiff = Date.now() - alarmDataCache.updateTime;
     console.debug(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
     
-    if(cacheData.updateTime > 0 && timeDiff > 18000000)
+    if(alarmDataCache.updateTime > 0 && timeDiff > 18000000)
     {
         console.debug(`reset alarm time`);
-        cacheData = new AlarmData();
-        alarmDataHandler.setValue(cacheData);
+        alarmDataCache = new AlarmData();
+        alarmDataHandler.saveValue(alarmDataCache);
     }
     
-    console.debug(`result : ${JSON.stringify(cacheData)}`);
+    console.debug(`result : ${JSON.stringify(alarmDataCache)}`);
 
     alarmPeriodHandler.addListener((oldPeriod, newPeriod) => updateData());
     
-    let targetUrls = [];
+    let targetUrls = urlListHandler.value;
     urlListHandler.addListener(
         (oldValue, newValue) =>
         {
@@ -101,9 +101,15 @@ const tabUrlMapInit =
     const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
 
     updateData = async () =>
-    {
-        console.debug(`current tab ${currentTabId}, url : ${tabUrlMap[currentTabId]}`);
+        {
+            console.debug(`current tab ${currentTabId}, url : ${tabUrlMap[currentTabId]}`);
+            updateTimeAndTryShootNotification();
+            await alarmDataHandler.saveValue(alarmDataCache);
+        }
 
+
+    function updateTimeAndTryShootNotification()
+    {
         if(!isInTargetUrls(tabUrlMap[currentTabId]))
         {
             prevOpenTime = -1;
@@ -117,22 +123,20 @@ const tabUrlMapInit =
         }
 
         var currentTime = Date.now();
-        cacheData.updateTime = currentTime;
-        cacheData.totalUsingTime += (currentTime - prevOpenTime) / 60000;
+        alarmDataCache.updateTime = currentTime;
+        alarmDataCache.totalUsingTime += (currentTime - prevOpenTime) / 60000;
         prevOpenTime = currentTime;
 
-        if(cacheData.totalUsingTime >= cacheData.lastAlarmTime + alarmPeriodHandler.value)
+        if(alarmDataCache.totalUsingTime >= alarmDataCache.lastAlarmTime + alarmPeriodHandler.value)
         {
-            console.debug(`on alarm : ${JSON.stringify(cacheData)}`);
+            console.debug(`on alarm : ${JSON.stringify(alarmDataCache)}`);
         
-            cacheData.lastAlarmTime = cacheData.totalUsingTime;
+            alarmDataCache.lastAlarmTime = alarmDataCache.totalUsingTime;
             createMyNotification(
                 "Time Alarm",
-                timeSaver.dataToInfoString(cacheData, alarmPeriodHandler.value),
+                timeSaver.dataToInfoString(alarmDataCache, alarmPeriodHandler.value),
                 [{title : "Got it"}])
         }
-
-        timeSaver.saveAlarmData(cacheData);
     };
     console.debug(`Worker initialization finished`);
 })();

@@ -9,16 +9,22 @@ export function ValueHandler(key, value)
     console.debug(`init <${key}> : ${JSON.stringify(value)}`);
     this.key = key;
     this.value = value;
-    this.listeners = [];
+    this.listeners = new Array();
+    let valueHandler = this;
+
     chrome.storage.local
         .onChanged
-        .addListener((changes) =>
+        .addListener(
+            function(changes)
             {
                 let targetChange = changes[key];
                 if (targetChange !== undefined)
                 {
-                    this.value = targetChange.newValue;
-                    this.listeners.foreach((callBack) => callBack(targetChange.oldValue, targetChange.newValue));
+                    valueHandler.value = targetChange.newValue;
+                    valueHandler.listeners.forEach(function(callBack) 
+                        {
+                            callBack(targetChange.oldValue, targetChange.newValue);
+                        });
                 }
             });
 };
@@ -38,7 +44,7 @@ ValueHandler.prototype =
                 return;
             this.listeners.slice(listenerIndex, 1);
         },
-        setValue: function(newValue)
+        saveValue: function(newValue)
         {
             console.debug(`save <${this.key}> : ${JSON.stringify(newValue)}`);
             return chrome.storage.local.set({[this.key] : newValue});
@@ -63,7 +69,7 @@ export const timeSaverInitializationPromise = (
 
         return {
             alarmName: "mySnsAlarm",
-            dataToInfoString: (data, alarmPeriod) => `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${data.nextAlarmUsingTime + alarmPeriod} minutes`,
+            dataToInfoString: (data, alarmPeriod) => `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${(data.lastAlarmTime + alarmPeriod).toFixed(0)} minutes`,
             dataHandler:  
                 {
                     alarmPeriod: dataHandlers[0],

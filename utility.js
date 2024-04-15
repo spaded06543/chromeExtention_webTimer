@@ -62,8 +62,6 @@ export const timeSaverInitializationPromise = (
 
         return {
             alarmName: "mySnsAlarm",
-            alarmTimeInMinutes: 10,
-            createDefaultAlarmData: createDefaultAlarmData,
             dataToInfoString: (data, alarmPeriod) => `Total spending time : ${data.totalUsingTime.toFixed(0)} minutes.\nNext alarm time : ${data.nextAlarmUsingTime + alarmPeriod} minutes`,
             dataHandler:  
                 {

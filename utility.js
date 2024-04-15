@@ -6,6 +6,7 @@ export function AlarmData() {
 
 export function ValueHandler(key, value)
 {
+    console.debug(`init <${key}> : ${JSON.stringify(value)}`);
     this.key = key;
     this.value = value;
     this.listeners = [];
@@ -17,7 +18,7 @@ export function ValueHandler(key, value)
                 if (targetChange !== undefined)
                 {
                     this.value = targetChange.newValue;
-                    this.listeners.foreach(callBack => callBack(targetChange.oldValue, targetChange.newValue));
+                    this.listeners.foreach((callBack) => callBack(targetChange.oldValue, targetChange.newValue));
                 }
             });
 };

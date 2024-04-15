@@ -87,7 +87,7 @@ const tabUrlMapInit =
     alarmPeriodHandler.addListener((oldPeriod, newPeriod) => updateData());
     
     let targetUrls = [];
-    urlListHandler.onUpdated.addListener(
+    urlListHandler.addListener(
         (oldValue, newValue) =>
         {
             targetUrls = newValue;

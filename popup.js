@@ -69,11 +69,11 @@ import { timeSaverInitializationPromise } from "./utility.js";
                 inputUrl.value = "";
             });
     
-    document.getElementById('timeThresholdInput').value = alarmPeriod.value;
-    timeSaver.dataHandler.alarmPeriod.addListener(
+    document.getElementById('alarmPeriod').value = alarmPeriod.value.toString();
+    alarmPeriod.addListener(
         (oldValue, newValue) =>
         {
-            document.getElementById('timeThresholdInput').value = newValue;
+            document.getElementById('alarmPeriod').value = newValue;
         });
 
     document

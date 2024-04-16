@@ -118,12 +118,12 @@ const tabUrlMapInit =
             Process :
                 (currentTime) => 
                 {
-                    if (currentTime <= this.prevTime)
+                    if (currentTime <= statusOn.prevTime)
                         return;
 
                     alarmDataCache.updateTime = currentTime;
-                    alarmDataCache.totalUsingTime += (currentTime - this.prevTime) / 60000;
-                    this.prevTime = currentTime;
+                    alarmDataCache.totalUsingTime += (currentTime - statusOn.prevTime) / 60000;
+                    statusOn.prevTime = currentTime;
             
                     if(alarmDataCache.totalUsingTime >= alarmDataCache.lastAlarmTime + alarmPeriodHandler.value)
                     {

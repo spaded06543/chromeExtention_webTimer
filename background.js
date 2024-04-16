@@ -99,45 +99,61 @@ const tabUrlMapInit =
 
     const isInTargetUrls = (url) => url && indexOfUrl(url ?? "") != -1;
     const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
+    
+    const statusOff = 
+        {
+            Process : (currentTime) => {},
+            Next : (inUrlList) =>
+                {
+                    if(!inUrlList)
+                        return statusOff;
+                    statusOn.prevTime = Date.now();
+                    return statusOn;
+                }
+        };
+
+    const statusOn = 
+        {
+            prevTime: -1,
+            Process :
+                (currentTime) => 
+                {
+                    if (currentTime <= this.prevTime)
+                        return;
+
+                    alarmDataCache.updateTime = currentTime;
+                    alarmDataCache.totalUsingTime += (currentTime - this.prevTime) / 60000;
+                    this.prevTime = currentTime;
+            
+                    if(alarmDataCache.totalUsingTime >= alarmDataCache.lastAlarmTime + alarmPeriodHandler.value)
+                    {
+                        console.debug(`on alarm : ${JSON.stringify(alarmDataCache)}`);
+                    
+                        alarmDataCache.lastAlarmTime = alarmDataCache.totalUsingTime;
+                        createMyNotification(
+                            "Time Alarm",
+                            timeSaver.dataToInfoString(alarmDataCache, alarmPeriodHandler.value),
+                            [{title : "Got it"}])
+                    }
+                },
+            Next : (inUrlList) =>
+                {
+                    if(inUrlList)
+                        return statusOn;
+                    return statusOff;
+                }
+        };
+
+    var status = statusOff;
 
     updateData = async () =>
         {
             console.debug(`current tab ${currentTabId}, url : ${tabUrlMap[currentTabId]}`);
-            updateTimeAndTryShootNotification();
-            await alarmDataHandler.saveValue(alarmDataCache);
+            status = status.Next(isInTargetUrls(tabUrlMap[currentTabId]));
+            status.Process(Date.now());
+            alarmDataHandler.saveValue(alarmDataCache);
         }
 
-
-    function updateTimeAndTryShootNotification()
-    {
-        if(!isInTargetUrls(tabUrlMap[currentTabId]))
-        {
-            prevOpenTime = -1;
-            return;
-        }
-        
-        if(prevOpenTime == -1)
-        {
-            prevOpenTime = Date.now();
-            return;
-        }
-
-        var currentTime = Date.now();
-        alarmDataCache.updateTime = currentTime;
-        alarmDataCache.totalUsingTime += (currentTime - prevOpenTime) / 60000;
-        prevOpenTime = currentTime;
-
-        if(alarmDataCache.totalUsingTime >= alarmDataCache.lastAlarmTime + alarmPeriodHandler.value)
-        {
-            console.debug(`on alarm : ${JSON.stringify(alarmDataCache)}`);
-        
-            alarmDataCache.lastAlarmTime = alarmDataCache.totalUsingTime;
-            createMyNotification(
-                "Time Alarm",
-                timeSaver.dataToInfoString(alarmDataCache, alarmPeriodHandler.value),
-                [{title : "Got it"}])
-        }
-    };
     console.debug(`Worker initialization finished`);
 })();
 

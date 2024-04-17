@@ -71,7 +71,7 @@ const tabUrlMapInit =
     const urlListHandler = timeSaver.dataHandler.urlList;
     const alarmPeriodHandler = timeSaver.dataHandler.alarmPeriod;
     
-    const alarmDataCache = alarmDataHandler.value;
+    let alarmDataCache = alarmDataHandler.value;
     const timeDiff = Date.now() - alarmDataCache.updateTime;
     console.debug(`check reset timer condition\npassing time from last update : ${(timeDiff / 60000).toFixed(0)} minutes`);
     

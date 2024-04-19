@@ -99,31 +99,29 @@ const tabUrlMapInit =
 
     const isInTargetUrls = (url) => url && indexOfUrl(url ?? "") != -1;
     const indexOfUrl = (url) => targetUrls.findIndex(v => url.startsWith(v));
-    
+    const getNextStatus = function(inUrlList)
+        {
+            if(inUrlList)
+                return statusOn.CreateNext();
+            return statusOff.CreateNext();
+        };
+
     const statusOff = 
         {
-            Process : (currentTime) => {},
-            Next : (inUrlList) =>
-                {
-                    if(!inUrlList)
-                        return statusOff;
-                    statusOn.prevTime = Date.now();
-                    return statusOn;
-                }
+            Process : () => {},
+            CreateNext : () => statusOff,
         };
 
     const statusOn = 
         {
             prevTime: -1,
             Process :
-                (currentTime) => 
+                () => 
                 {
-                    if (currentTime <= statusOn.prevTime)
-                        return;
-
+                    var currentTime = Date.now();
+                    
                     alarmDataCache.updateTime = currentTime;
                     alarmDataCache.totalUsingTime += (currentTime - statusOn.prevTime) / 60000;
-                    statusOn.prevTime = currentTime;
             
                     if(alarmDataCache.totalUsingTime >= alarmDataCache.lastAlarmTime + alarmPeriodHandler.value)
                     {
@@ -136,12 +134,11 @@ const tabUrlMapInit =
                             [{title : "Got it"}])
                     }
                 },
-            Next : (inUrlList) =>
+            CreateNext : () => 
                 {
-                    if(inUrlList)
-                        return statusOn;
-                    return statusOff;
-                }
+                    statusOn.prevTime = Date.now();
+                    return statusOn;
+                },
         };
 
     var status = statusOff;
@@ -149,8 +146,8 @@ const tabUrlMapInit =
     updateData = async () =>
         {
             console.debug(`current tab ${currentTabId}, url : ${tabUrlMap[currentTabId]}`);
-            status = status.Next(isInTargetUrls(tabUrlMap[currentTabId]));
-            status.Process(Date.now());
+            status.Process();
+            status = getNextStatus(isInTargetUrls(tabUrlMap[currentTabId]));
             alarmDataHandler.saveValue(alarmDataCache);
         }
 

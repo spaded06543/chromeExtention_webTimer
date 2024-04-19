@@ -127,7 +127,9 @@ const tabUrlMapInit =
                     {
                         console.debug(`on alarm : ${JSON.stringify(alarmDataCache)}`);
                     
-                        alarmDataCache.lastAlarmTime = alarmDataCache.totalUsingTime;
+                        alarmDataCache.lastAlarmTime += 
+                            Math.floor((alarmDataCache.totalUsingTime - alarmDataCache.lastAlarmTime) / alarmPeriodHandler.value)
+                            * alarmPeriodHandler.value;
                         createMyNotification(
                             "Time Alarm",
                             timeSaver.dataToInfoString(alarmDataCache, alarmPeriodHandler.value),

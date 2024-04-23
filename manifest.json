@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "<3 Time saver <3",
-  "description": "Showing notification when you wasting too much time on certain websites",
+  "name": "Web Timer",
+  "description": "Record using time among specified websites and show notification if the setting time is gone",
   "version": "1.0",
   "icons": {
     "16": "images/timer_16.png",

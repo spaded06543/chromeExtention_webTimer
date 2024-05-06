@@ -6,7 +6,7 @@ chrome.alarms.getAll().then(
         if(alarms.length == 0)
         {
             chrome.alarms.create(
-                timeSaver.alarmName,
+                "webTimer",
                 {
                     periodInMinutes : 0.1,
                 });
